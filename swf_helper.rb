@@ -39,10 +39,17 @@ module RegistrationExample
       end
     end # initialize
 
-    # Set up the workflow
-    def setup_registration_workflow(workflow_execution_time_limit, task_execution_time_limit)
+    # Set up the "subscription" workflow
+    #
+    # @param [Integer] workflow_execution_time_limit
+    #   The time limit, in seconds, for the entire workflow.
+    #
+    # @param [Integer] decision_execution_time_limit
+    #   The time limit, in seconds, for any decision task on this workflow.
+    #
+    def setup_subscription_workflow(workflow_execution_time_limit, decision_execution_time_limit)
       # define some data associated with the workflow.
-      @workflow_name = "#{@domain_name}-registration-workflow"
+      @workflow_name = "#{@domain_name}-subscription-workflow"
       @workflow = nil
       @task_list_name = "#{@domain_name}-tasks"
       @task_list_name.freeze
@@ -60,8 +67,8 @@ module RegistrationExample
           :default_child_policy => :terminate,
           :default_execution_start_to_close_timeout => workflow_execution_time_limit,
           :default_task_list => @task_list_name,
-          :default_task_start_to_close_timeout => task_execution_time_limit,
-          :description => "#{@domain_name} registration workflow"})
+          :default_task_start_to_close_timeout => decision_execution_time_limit,
+          :description => "#{@domain_name} subscription workflow"})
       end
     end # setup_workflow
 
@@ -83,7 +90,7 @@ module RegistrationExample
           :default_task_schedule_to_start_timeout => task_start_time_limit,
           :default_task_schedule_to_close_timeout => task_total_time_limit,
           :default_task_start_to_close_timeout => task_execution_time_limit,
-          :description => "#{@domain_name} start registration activity"})
+          :description => "#{@domain_name} start subscription activity"})
       end
     end # setup_start_subscribe_activity
 
@@ -121,8 +128,8 @@ module RegistrationExample
     swf_helper = SWFHelper.new("DataFrobotz")
     puts "Registered domain: DataFrobotz"
 
-    swf_helper.setup_registration_workflow(3600, 360)
-    puts "Registered user registration workflow"
+    swf_helper.setup_subscription_workflow(3600, 360)
+    puts "Registered user subscription workflow"
 
     swf_helper.setup_start_subscribe_activity(3600, 10, 420)
     puts "Registered subscribe activity"
