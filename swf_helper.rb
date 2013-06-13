@@ -1,43 +1,89 @@
 require 'aws'
-require './console_helper.rb'
+require './generic_interface.rb'
 
-module RegistrationExample
-  # Sets up a Simple Workflow environment for the RegistrationExample workflow.
+module SubscriptionWorkflowExample
+
+  # Handles execution of the subscribe/login/unsubscribe workflows.
+  #
   class SWFHelper
 
     # Create the SWFHelper object and register a domain to launch our workflow in.
-    def initialize(domain_name)
+    #
+    # @param [GenericInterface] interface
+    #   The user interface to use with the workflow helper. It is expected that the class passed in implements all of
+    #   the methods in {GenericInterface}.
+    #
+    # @param [String] domain_name
+    #   The domain name to register.
+    #
+    def initialize(interface, domain_name)
       # Define some data associated with the domain.
       @swf = AWS::SimpleWorkflow.new
+      @interface = interface
       @domain_name = domain_name
       @domain_name.freeze # domain_name will not change.
 
+      @workflow_names = {
+        :login => "#{@domain_name}-login-workflow",
+        :subscribe => "#{@domain_name}-subscribe-workflow",
+        :unsubscribe => "#{@domain_name}-unsubscribe-workflow" }
+
+      @workflow_objects = {
+        :login => "#{@domain_name}-login-workflow",
+        :subscribe => "#{@domain_name}-subscribe-workflow",
+        :unsubscribe => "#{@domain_name}-unsubscribe-workflow" }
+
       @activity_names = {
-        :subscribe => "#{@domain_name}-subscribe-activity",
+        :subscribe     => "#{@domain_name}-subscribe-activity",
         :confirm_email => "#{@domain_name}-confirm-email-activity",
-        :confirm_sms => "#{@domain_name}-confirm-sms-activity",
-        :send_success => "#{@domain_name}-send-success-activity",
-        :send_failure => "#{@domain_name}-send-failure-activity" }
+        :confirm_sms   => "#{@domain_name}-confirm-sms-activity",
+        :send_success  => "#{@domain_name}-send-success-activity",
+        :send_failure  => "#{@domain_name}-send-failure-activity" }
       @activity_objects = {
-        :subscribe => nil,
+        :subscribe     => nil,
         :confirm_email => nil,
-        :confirm_sms => nil,
-        :send_success => nil,
-        :send_failure => nil }
+        :confirm_sms   => nil,
+        :send_success  => nil,
+        :send_failure  => nil }
       @activity_threads = {
-        :subscribe => nil,
+        :subscribe     => nil,
         :confirm_email => nil,
-        :confirm_sms => nil,
-        :send_success => nil,
-        :send_failure => nil }
+        :confirm_sms   => nil,
+        :send_success  => nil,
+        :send_failure  => nil }
 
       # First, check to see if the domain already exists.
       @domain = @swf.domains[@domain_name]
       if @domain == nil
         # Register the domain for just a day. This is merely a test, after all.
-        @domain = @swf.domains.create(@domain_name, 1, { :description => 'RegistrationExample domain' })
+        @domain = @swf.domains.create(@domain_name, 1, { :description => 'SubscriptionExample domain' })
       end
-    end # initialize
+    end
+
+    # Initiates the workflow indicated by `type`.
+    #
+    # @param [Symbol] type
+    #   One of the following:
+    #
+    #   * `:login` - Begins the login user workflow.
+    #   * `:subscribe` - Begins the subscribe user workflow.
+    #   * `:unsubscribe` - Begins the unsubscribe user workflow.
+    #
+    def do_workflow(type)
+      case type
+        when :login
+        when :subscribe
+          setup_subscription_workflow(3600, 360)
+          puts "Registered user subscription workflow"
+          setup_subscribe_activity(3600, 10, 420)
+          puts "Registered subscribe activity"
+          puts "Beginning workflow..."
+          begin_workflow_execution
+          puts "Polling for events..."
+          poll_for_workflow_events
+        when :unsubscribe
+      end
+    end
 
     # Set up the "subscription" workflow
     #
@@ -47,9 +93,9 @@ module RegistrationExample
     # @param [Integer] decision_execution_time_limit
     #   The time limit, in seconds, for any decision task on this workflow.
     #
-    def setup_subscription_workflow(workflow_execution_time_limit, decision_execution_time_limit)
+    def setup_workflow(type, workflow_execution_time_limit, decision_execution_time_limit)
       # define some data associated with the workflow.
-      @workflow_name = "#{@domain_name}-subscription-workflow"
+      @workflow_name = "#{@domain_name}-#{@type.to_s}-workflow"
       @workflow = nil
       @task_list_name = "#{@domain_name}-tasks"
       @task_list_name.freeze
@@ -78,13 +124,13 @@ module RegistrationExample
       # Register the activity
       @subscribe_activity = nil
       @domain.activity_types.each do | a |
-        if(a.name == activity_name)
+        if a.name == @activity_names[:subscribe]
           @subscribe_activity = a
         end
       end
 
       if @subscribe_activity == nil
-        @subscribe_activity = @domain.activity_types.register(@activity_names[:register], "v1", {
+        @subscribe_activity = @domain.activity_types.register(@activity_names[:subscribe], "v1", {
           :default_task_list => @task_list_name,
           :default_task_heartbeat_timeout => heartbeat_time_limit,
           :default_task_schedule_to_start_timeout => task_start_time_limit,
@@ -125,13 +171,13 @@ module RegistrationExample
 
   # Test the SWFHelper class.
   def self.test_swf_helper
-    swf_helper = SWFHelper.new("DataFrobotz")
+    swf_helper = SWFHelper.new(nil, 'DataFrobotz')
     puts "Registered domain: DataFrobotz"
 
     swf_helper.setup_subscription_workflow(3600, 360)
     puts "Registered user subscription workflow"
 
-    swf_helper.setup_start_subscribe_activity(3600, 10, 420)
+    swf_helper.setup_subscribe_activity(3600, 10, 420)
     puts "Registered subscribe activity"
 
     puts "Beginning workflow..."
@@ -141,12 +187,12 @@ module RegistrationExample
     swf_helper.poll_for_workflow_events
   end
 
-end # RegistrationExample
+end # SubscriptionWorkflowExample
 
 # If this file is run, such as:
 #
 #     $ ruby swf_helper.rb
 #
 # The function below will test the class.
-RegistrationExample.test_swf_helper
+#SubscriptionWorkflowExample.test_swf_helper
 
