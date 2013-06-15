@@ -1,5 +1,4 @@
 require './generic_interface.rb'
-require './swf_helper.rb'
 
 # The SubscriptionWorkflowExample demonstrates a simple site subscription workflow in Ruby, using the AWS SDK for Ruby,
 # Amazon Simple Workflow and Amazon Simple Notification Service.
@@ -24,17 +23,17 @@ module SubscriptionWorkflowExample
 
     # Creates a new console interface for the subscription workflow example.
     def initialize
-      @swf_helper = SWFHelper.new(self, 'DataFrobotz')
+      show_splash
     end
 
-    # (see GenericInterface#get_subscription_data)
-    def get_subscription_data
+    # (see GenericInterface#get_subscriber_data)
+    def get_subscriber_data
       puts ".---------------------------------------------."
       puts "| How would you like to subscribe? You can    |"
       puts "| subscribe with either:                      |"
       puts "|                                             |"
       puts "| * your email address                        |"
-      puts "| * your phone number                         |"
+      puts "| * your phone number (for SMS messages)      |"
       puts "|                                             |"
       puts "| Note: your phone must be able to accept SMS |"
       puts "| messages to subscribe by phone.             |"
@@ -46,8 +45,8 @@ module SubscriptionWorkflowExample
         :sms => prompt_with_confirmation("\nPhone number (numbers *only*)") }
     end
 
-    # (see GenericInterface#get_subscriber_info)
-    def get_subscriber_info
+    # (see GenericInterface#get_subscriber_id)
+    def get_subscriber_id
       puts ".---------------------------------------------."
       puts "| Enter your subscription id. This can be     |"
       puts "| either your confirmed email address or sms  |"
@@ -116,21 +115,21 @@ module SubscriptionWorkflowExample
     # Starts the "login" workflow.
     def do_login
       puts "\n**          Log in to Data-Frobotz           **"
-      data = get_subscriber_info
+      data = get_subscriber_id
       puts "  #{data}"
     end
 
     # Starts the "subscribe" workflow.
     def do_subscribe
       puts "\n**        Subscribe to Data-Frobotz          **"
-      data = get_subscription_data
+      data = get_subscriber_data
       puts "  #{data}"
     end
 
     # Starts the "unsubscribe" workflow.
     def do_unsubscribe
       puts "\n**      Unsubscribe from Data-Frobotz        **"
-      data = get_subscriber_info
+      data = get_subscriber_id
       puts "  #{data}"
     end
 
@@ -148,7 +147,7 @@ module SubscriptionWorkflowExample
     # @return [String]
     #   The the text that was entered (and agreed upon), or `nil` if the user exited.
     #
-    def prompt_with_confirmation(prompt_text = "")
+    def self.prompt_with_confirmation(prompt_text = "")
       confirmed = :false
       user_text = nil
       while confirmed == :false
@@ -181,8 +180,4 @@ module SubscriptionWorkflowExample
     end # prompt_with_confirmation
   end
 end
-
-# If this file is run, show the splash screen.
-app = SubscriptionWorkflowExample::ConsoleInterface.new
-app.show_splash
 

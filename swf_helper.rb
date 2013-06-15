@@ -39,12 +39,14 @@ module SubscriptionWorkflowExample
         :confirm_sms   => "#{@domain_name}-confirm-sms-activity",
         :send_success  => "#{@domain_name}-send-success-activity",
         :send_failure  => "#{@domain_name}-send-failure-activity" }
+
       @activity_objects = {
         :subscribe     => nil,
         :confirm_email => nil,
         :confirm_sms   => nil,
         :send_success  => nil,
         :send_failure  => nil }
+
       @activity_threads = {
         :subscribe     => nil,
         :confirm_email => nil,
@@ -85,7 +87,7 @@ module SubscriptionWorkflowExample
       end
     end
 
-    # Set up the "subscription" workflow
+    # Set up a workflow
     #
     # @param [Integer] workflow_execution_time_limit
     #   The time limit, in seconds, for the entire workflow.
@@ -168,31 +170,5 @@ module SubscriptionWorkflowExample
       end
     end
   end # SWFHelper
-
-  # Test the SWFHelper class.
-  def self.test_swf_helper
-    swf_helper = SWFHelper.new(nil, 'DataFrobotz')
-    puts "Registered domain: DataFrobotz"
-
-    swf_helper.setup_subscription_workflow(3600, 360)
-    puts "Registered user subscription workflow"
-
-    swf_helper.setup_subscribe_activity(3600, 10, 420)
-    puts "Registered subscribe activity"
-
-    puts "Beginning workflow..."
-    swf_helper.begin_workflow_execution
-
-    puts "Polling for events..."
-    swf_helper.poll_for_workflow_events
-  end
-
 end # SubscriptionWorkflowExample
-
-# If this file is run, such as:
-#
-#     $ ruby swf_helper.rb
-#
-# The function below will test the class.
-#SubscriptionWorkflowExample.test_swf_helper
 

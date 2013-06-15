@@ -1,101 +1,44 @@
 require 'aws'
 require './generic_workflow.rb'
+require './console_interface.rb'
+require './get_subscription_info_activity.rb'
+require './subscribe_user_activity.rb'
+require './confirm_email_activity.rb'
+require './confirm_sms_activity.rb'
+require './send_subscription_success_activity.rb'
 
 module SubscriptionWorkflowExample
-
-  # An activity that collects subscription information from the user.
-  class GetSubscriptionInfoActivity < GenericActivity
-
-    # Starts the subscribe-user activity.
-    def initialize(domain, workflow, interface)
-      super(domain, workflow)
-      @interface = interface
-      @domain.activity_types.create('subscribe-user', '1',
-        :default_task_list => @workflow.default_task_list,
-        :default_heartbeat_timeout => :none,
-        :default_task_schedule_to_start_timeout => 60,
-        :default_task_schedule_to_close_timeout => 3660,
-        :default_task_start_to_close_timeout => 3600,
-        :description => "#{@domain.name} start subscription activity")
-    end
-
-    # Starts the subscribe-user activity.
-    def start
-      subscription_data = @interface.get_subscription_data
-    end
-  end
-
-  # An activity that waits for confirmation of the user's email address.
-  class ConfirmEmailActivity < GenericActivity
-
-    # Creates the confirm-user-email activity.
-    def initialize(domain, workflow, interface)
-      super(domain, workflow)
-      @interface = interface
-      @domain.activity_types.create('confirm-user-email', '1',
-        :default_task_list => @workflow.default_task_list,
-        :default_heartbeat_timeout => :none,
-        :default_task_schedule_to_start_timeout => 60,
-        :default_task_schedule_to_close_timeout => 3660,
-        :default_task_start_to_close_timeout => 3600)
-    end
-
-    # Starts the confirm-user-email activity.
-    def start
-    end
-  end
-
-  # An activity that waits for confirmation of the user's SMS phone number.
-  class ConfirmSMSActivity < GenericActivity
-
-    # Creates the confirm-user-phone activity.
-    def initialize(domain, workflow, interface)
-      super(domain, workflow)
-      @interface = interface
-      @domain.activity_types.create('confirm-user-phone', '1',
-        :default_task_list => @workflow.default_task_list,
-        :default_heartbeat_timeout => :none,
-        :default_task_schedule_to_start_timeout => 60,
-        :default_task_schedule_to_close_timeout => 3660,
-        :default_task_start_to_close_timeout => 3600)
-    end
-
-    # Starts the confirm-user-phone activity.
-    def start
-    end
-  end
-
-  # An activity that sends a success notification to the user, using either the email address or phone number that was
-  # confirmed by the confirm-user-email or confirm-user-phone activities.
-  class SendSubscriptionSuccessActivity < GenericActivity
-
-    # Creates the send-success activity.
-    def initialize(domain, workflow, interface)
-      super(domain, workflow)
-      @interface = interface
-      @domain.activity_types.create('send-success', '1',
-        :default_task_list => @workflow.default_task_list,
-        :default_heartbeat_timeout => :none,
-        :default_task_schedule_to_start_timeout => 60,
-        :default_task_schedule_to_close_timeout => 3660,
-        :default_task_start_to_close_timeout => 3600)
-    end
-
-    # Starts the send-success activity.
-    def start
-    end
-  end
-
   # Handles execution of the subscribe workflow.
+  #
   class SubscribeWorkflow < GenericWorkflow
+
+    # Creates a new user subscription workflow.
+    #
     # The subscription workflow looks like this:
     #
-    # activities = [ get_subscription_info, [ confirm_email, confirm_sms, :or ], send_subscription_success ]
+    #     activities = [ get_subscription_info, subscribe_user, [ confirm_email, confirm_sms, :or ], send_subscription_success ]
+    #
+    # @param domain
+    #   The [Domain](http://docs.aws.amazon.com/AWSRubySDK/latest/AWS/SimpleWorkflow/Domain.html) to register the
+    #   workflow in.
+    #
+    # @param [String] task_list
+    #   The task list to use for decision tasks.
+    #
+    # @param [GenericInterface] generic_interface
+    #   The generic interface that is used to communicate with the user.
     #
     def initialize(domain, task_list, generic_interface)
-      get_subscription_info = GetSubscriptionInfoActivity.new
-      activities = [ get_subcription_info, [ confirm_email, confirm_sms, :or ], send_subscription_success ]
-      super(domain, task_list, activities)
+      super(domain, 'subscribe', task_list)
+
+      # add the activities.
+      add_activity(GetSubscriptionInfoActivity.new(domain, @swf_workflow, generic_interface))
+      add_activity(SubscribeUserActivity.new(domain, @swf_workflow))
+      add_activity([ConfirmEmailActivity.new(domain, @swf_workflow),
+        ConfirmSMSActivity.new(domain, @swf_workflow), :or])
+      add_activity(SendSubscriptionSuccessActivity.new(domain, @swf_workflow))
+
+      # add some event handlers
     end
   end
 end

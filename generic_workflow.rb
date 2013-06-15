@@ -1,39 +1,98 @@
+require 'aws'
+
 module SubscriptionWorkflowExample
-  # A generic workflow class. It includes an activity list and a decider to interact with SWF.
+  # A generic workflow class. It includes an activity list and a decider to interact with Amazon Simple Workflow Service
+  # (SWF).
+  #
   class GenericWorkflow
 
-    # Creates a new GenericWorkflow.
+    # Creates a new GenericWorkflow and registers it, if necessary, with Amazon Simple Workflow (SWF). If you use this
+    # as a base class, you should invoke this constructor via `super` in your own class' initialize method.
     #
     # @param [String] domain
     #   The domain that the workflow will run within.
     #
+    # @param [String] workflow_name
+    #   The workflow name to use when registering the workflow with SWF.
+    #
     # @param [String] task_list
     #   The task list that will be used to poll for decision tasks.
     #
+    # @param [Hash] workflow_options
+    #   The workflow options to use. These are the same options listed in
+    #   [WorkflowTypeCollection#register](http://docs.aws.amazon.com/AWSRubySDK/latest/AWS/SimpleWorkflow/WorkflowTypeCollection.html#register-instance_method).
+    #   If no options are provided, then the following default values will be used:
+    #
+    #       :default_child_policy                     => :terminate
+    #       :default_execution_start_to_close_timeout => 86400 # 1d
+    #       :default_task_start_to_close_timeout      => 3600  # 1h
+    #       :default_task_list                        => task_list
+    #       :description                              => "#{domain} #{workflow_name} workflow"
+    #
     # @param [Array] activity_list
-    #   A list of activities to initialize the workflow with.
+    #   A list of activities to initialize the workflow with. If no activities are provided, you can use {#add_activity}
+    #   to add them after workflow creation.
     #
     #   **Note**: Even if you add activities this way, you can still call {#add_activity} to add new activities until
     #   {#start_workflow} is called.
     #
-    def initialize(domain, task_list, activity_list = nil)
-      @domain = domain
+    def initialize(domain, workflow_name, task_list, workflow_options = nil, activity_list = nil)
+      @swf_domain = domain
+
+      @name = workflow_name
       @task_list = task_list
+
       if(activity_list.nil?)
         @activities = []
       else
         @activities = activity_list
       end
+
+      @swf_workflow = nil
+
+      # Check to see if the workflow already exists.
+
+      @swf_domain.workflow_types.each do | w |
+        if w.name == @name
+          @swf_workflow = w
+        end
+      end
+
+      # Register the workflow
+
+      if workflow_options.nil?
+        # set some defaults.
+        workflow_options = {
+          :default_child_policy => :terminate,
+          :default_execution_start_to_close_timeout => 86400, # 1d
+          :default_task_start_to_close_timeout => 3600} # 1h
+      end
+
+      if workflow_options[:description].nil?
+        workflow_options[:description] = "#{@swf_domain.name} #{@name} workflow"
+      end
+
+      if workflow_options[:default_task_list].nil?
+        workflow_options[:default_task_list] = @task_list
+      end
+
+      if @swf_workflow == nil
+        @swf_workflow = @swf_domain.workflow_types.register(@name, "v1", workflow_options)
+      end
+
+      # Some data that will be used later. Setting initial values here.
       @event_handlers = {}
-      @running = false
-      @workflow_execution = nil
+      @running_threads = []
+      @success_condition = nil
+      @swf_workflow_execution = nil
+      @cur_activity = 0
     end
 
     # Begins the workflow. Once the workflow has started, it cannot be modified (in other words, you can't
     # {#add_activity add new activities} to it).
     def start_workflow
       @running = true
-      @workflow_execution = @workflow.start_execution
+      @swf_workflow_execution = @swf_workflow.start_execution
     end
 
     # Adds a new activity, or list of activities, to the end of the activity queue.
@@ -58,7 +117,7 @@ module SubscriptionWorkflowExample
         return false
       end
       # Add the new activity (or group) to the end of the activity list.
-      @activities += activity
+      @activities << activity
     end
 
     # Adds an event handler for the given event. When the event is detected by the workflow, the handler will be called
@@ -90,22 +149,25 @@ module SubscriptionWorkflowExample
     def run_activity(activity)
       if activity.kind_of?(Array)
          activity.each do | a |
-            Thread.new(a.start)
+           if a.kind_of?(GenericActivity)
+             @running_threads << Thread.new(a.start)
+           elsif a.kind_of?(Symbol)
+             @success_condition = a
+           end
          end
       elsif activity.kind_of?(GenericActivity)
-        Thread.new(activity.start)
+        @running_threads << Thread.new(activity.start)
       end
     end
 
     # The generic decider. All we're doing here is finding the right callback based on the event, and then calling
     # (`send`ing to) it.
     def poll_for_decision_tasks
-      @domain.decision_tasks.poll(@task_list_name) do | decision_task |
+      @swf_domain.decision_tasks.poll(@task_list_name) do | decision_task |
         decision_task.new_events.each do | event |
           puts "\nEvent received: #{event.inspect}"
           case event.event_type
           when 'WorkflowExecutionStarted' # Schedule the first activity.
-            @cur_activity = 0
             run_activity(@activities[@cur_activity])
           when 'WorkflowExecutionCompleted' # The workflow completed!
             @cur_activity += 1
@@ -123,5 +185,4 @@ module SubscriptionWorkflowExample
     end
   end
 end
-
 
