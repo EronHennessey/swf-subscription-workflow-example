@@ -1,4 +1,5 @@
 require './generic_interface.rb'
+require './subscribe_workflow.rb'
 
 # The SubscriptionWorkflowExample demonstrates a simple site subscription workflow in Ruby, using the AWS SDK for Ruby,
 # Amazon Simple Workflow and Amazon Simple Notification Service.
@@ -41,8 +42,8 @@ module SubscriptionWorkflowExample
       puts "                                               "
       puts "Please enter one, or both, of these values now."
       return_values = {
-        :email => prompt_with_confirmation("\nEmail address (you@example.com)"),
-        :sms => prompt_with_confirmation("\nPhone number (numbers *only*)") }
+        :email => ConsoleInterface.prompt_with_confirmation("\nEmail address (you@example.com)"),
+        :sms => ConsoleInterface.prompt_with_confirmation("\nPhone number (numbers *only*)") }
     end
 
     # (see GenericInterface#get_subscriber_id)
@@ -54,14 +55,14 @@ module SubscriptionWorkflowExample
       puts "|                                             |"
       puts "| Enter ':exit' to cancel.                    |"
       puts "'---------------------------------------------'"
-      return prompt_with_confirmation("\nID")
+      return ConsoleInterface.prompt_with_confirmation("\nID")
     end
 
     # Prints the site banner
     def print_banner
       puts "#=============================================#"
       puts "|ooo+                                     +ooo|"
-      puts "|oo+       Welcome to Data-Frobotz!        +oo|"
+      puts "|oo+       Welcome to Data-Frobtzz!        +oo|"
       puts "|ooo+                                     +ooo|"
       puts "#--------============================---------#"
     end
@@ -114,21 +115,22 @@ module SubscriptionWorkflowExample
 
     # Starts the "login" workflow.
     def do_login
-      puts "\n**          Log in to Data-Frobotz           **"
+      puts "\n**          Log in to Data-Frobtzz           **"
       data = get_subscriber_id
       puts "  #{data}"
     end
 
     # Starts the "subscribe" workflow.
     def do_subscribe
-      puts "\n**        Subscribe to Data-Frobotz          **"
-      data = get_subscriber_data
-      puts "  #{data}"
+      puts "\n**        Subscribe to Data-Frobtzz          **"
+      subscribe_workflow = SubscribeWorkflow.new('DataFrobtzz', self)
+      subscribe_workflow.start # this blocks until the workflow is closed
+      show_splash # return to the menu screen.
     end
 
     # Starts the "unsubscribe" workflow.
     def do_unsubscribe
-      puts "\n**      Unsubscribe from Data-Frobotz        **"
+      puts "\n**      Unsubscribe from Data-Frobtzz        **"
       data = get_subscriber_id
       puts "  #{data}"
     end

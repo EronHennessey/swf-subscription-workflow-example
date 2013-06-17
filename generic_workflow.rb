@@ -1,10 +1,14 @@
 require 'aws'
+#require 'logger'
 
 module SubscriptionWorkflowExample
   # A generic workflow class. It includes an activity list and a decider to interact with Amazon Simple Workflow Service
   # (SWF).
   #
   class GenericWorkflow
+
+    attr_accessor :swf_workflow
+    attr_accessor :swf_domain
 
     # Creates a new GenericWorkflow and registers it, if necessary, with Amazon Simple Workflow (SWF). If you use this
     # as a base class, you should invoke this constructor via `super` in your own class' initialize method.
@@ -36,11 +40,28 @@ module SubscriptionWorkflowExample
     #   **Note**: Even if you add activities this way, you can still call {#add_activity} to add new activities until
     #   {#start_workflow} is called.
     #
-    def initialize(domain, workflow_name, task_list, workflow_options = nil, activity_list = nil)
-      @swf_domain = domain
+    def initialize(domain_name, workflow_name, workflow_options = nil, activity_list = nil)
+      #@logger = Logger.new("#{domain_name}-decision.log")
+      #@logger.level = Logger::INFO
+      @swf = AWS::SimpleWorkflow.new
+
+      # First, check to see if the domain already exists and is registered.
+      @swf.domains.registered.each do | d |
+        if(d.name == domain_name)
+          @swf_domain = d
+        end
+      end
+
+      if @swf_domain.nil?
+        # Register the domain for just a day. This is merely a test, after all.
+        @swf_domain = @swf.domains.create(domain_name, 1, { :description => "#{domain_name} domain" })
+      else
+        puts "Domain found: #{@swf_domain.inspect}"
+        puts "Status: #{@swf_domain.status}"
+      end
 
       @name = workflow_name
-      @task_list = task_list
+      @task_list = "#{domain_name}-#{workflow_name}-tasks".downcase
 
       if(activity_list.nil?)
         @activities = []
@@ -51,15 +72,13 @@ module SubscriptionWorkflowExample
       @swf_workflow = nil
 
       # Check to see if the workflow already exists.
-
       @swf_domain.workflow_types.each do | w |
         if w.name == @name
           @swf_workflow = w
         end
       end
 
-      # Register the workflow
-
+      # if workflow options were not passed in, set some defaults.
       if workflow_options.nil?
         # set some defaults.
         workflow_options = {
@@ -76,23 +95,33 @@ module SubscriptionWorkflowExample
         workflow_options[:default_task_list] = @task_list
       end
 
+      # Register the workflow
       if @swf_workflow == nil
-        @swf_workflow = @swf_domain.workflow_types.register(@name, "v1", workflow_options)
+        @swf_workflow = @swf_domain.workflow_types.register(@name, "v3", workflow_options)
       end
 
       # Some data that will be used later. Setting initial values here.
       @event_handlers = {}
-      @running_threads = []
       @success_condition = nil
       @swf_workflow_execution = nil
-      @cur_activity = 0
+      @cur_activity_index = 0
     end
 
     # Begins the workflow. Once the workflow has started, it cannot be modified (in other words, you can't
     # {#add_activity add new activities} to it).
-    def start_workflow
+    def start
       @running = true
       @swf_workflow_execution = @swf_workflow.start_execution
+      while @swf_workflow_execution.open?
+        puts "\n*** beep! >>>\n"
+        poll_for_decision_tasks
+        puts "\n<<< peeb! ***\n"
+        sleep(0.4)
+        puts "\n*** boop! >>>\n"
+        poll_for_activity_tasks
+        puts "\n<<< poob! ***\n"
+        sleep(0.25)
+      end
     end
 
     # Adds a new activity, or list of activities, to the end of the activity queue.
@@ -143,44 +172,90 @@ module SubscriptionWorkflowExample
 
     # Runs the given activity (or set of activities).
     #
-    # @param [GenericActivity, Array<GenericActivity>] activity
-    #   The activity to run, or an array of activities to run concurrently.
+    # @param [String] activity
+    #   The name of the activity to run.
     #
-    def run_activity(activity)
-      if activity.kind_of?(Array)
-         activity.each do | a |
+    def run_activity(activity_task)
+      activity_name = activity_task.activity_type.name
+      puts "run_activity #{activity_name}"
+
+      cur_activity = @activities[@cur_activity_index]
+
+      if cur_activity.kind_of?(Array)
+         puts "in array"
+         cur_activity.each do | a |
+           if a.kind_of?(GenericActivity) && (a.name == activity_name)
+             a.start(activity_task)
+           end
+         end
+      elsif cur_activity.kind_of?(GenericActivity)
+        cur_activity.start(activity_task)
+      else
+        puts "unknown type: #{cur_activity}"
+      end
+    end
+
+    # schedule an activity using a decision task received from SWF.
+    #
+    # @param decision_task
+    #   The decision task received via {#poll_for_decision_tasks}
+    #
+    def schedule_cur_activity(decision_task)
+      puts "#schedule_cur_activity (#{@cur_activity_index})"
+      cur_activity = @activities[@cur_activity_index]
+      if cur_activity.kind_of?(Array)
+         puts "in array"
+         cur_activity.each do | a |
            if a.kind_of?(GenericActivity)
-             @running_threads << Thread.new(a.start)
-           elsif a.kind_of?(Symbol)
+             puts "scheduling activity in array (#{a.name})"
+             decision_task.schedule_activity_task(a.swf_activity, { :control => a.name })
+           elsif a.kind_of?(Symbol) # :and, :or
+             puts "recording array success condition (#{a.to_s})"
              @success_condition = a
            end
          end
-      elsif activity.kind_of?(GenericActivity)
-        @running_threads << Thread.new(activity.start)
+      elsif cur_activity.kind_of?(GenericActivity)
+        puts "scheduling activity (#{cur_activity.name})"
+        decision_task.schedule_activity_task(cur_activity.swf_activity, { :control => cur_activity.name })
+      else
+        puts "unknown type: #{cur_activity}"
+      end
+    end
+
+    # Poll for any activity tasks...
+    #
+    def poll_for_activity_tasks
+      puts "poll_for_activity_tasks (#{@task_list})"
+      if activity_task = @swf_domain.activity_tasks.poll_for_single_task(@task_list)
+        puts "\nActivity task received: #{activity_task.activity_type.name}"
+        run_activity(activity_task)
       end
     end
 
     # The generic decider. All we're doing here is finding the right callback based on the event, and then calling
-    # (`send`ing to) it.
+    # (`send`ing to) it. This is called, typically, by {#start}
+    #
     def poll_for_decision_tasks
-      @swf_domain.decision_tasks.poll(@task_list_name) do | decision_task |
+      puts "poll_for_decision_tasks (#{@task_list})"
+      # get a single task
+      if decision_task = @swf_domain.decision_tasks.poll_for_single_task(@task_list)
         decision_task.new_events.each do | event |
-          puts "\nEvent received: #{event.inspect}"
+          puts "\nDecision event received: #{event.inspect}"
           case event.event_type
           when 'WorkflowExecutionStarted' # Schedule the first activity.
-            run_activity(@activities[@cur_activity])
+            schedule_cur_activity(decision_task)
           when 'WorkflowExecutionCompleted' # The workflow completed!
-            @cur_activity += 1
-            run_activity(@activities[@cur_activity])
+            puts "Workflow execution complete!"
           else
             # find the handler...
-            handler = @event_handlers[event.event_type]
+            handler = @event_handlers[event.event_type.to_sym]
             if handler != nil
               # and call it.
-              send(handler, event)
+              send(handler, decision_task, event)
             end
           end
         end
+        decision_task.complete!
       end
     end
   end

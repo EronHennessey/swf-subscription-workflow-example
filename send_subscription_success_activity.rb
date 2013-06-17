@@ -11,21 +11,18 @@ module SubscriptionWorkflowExample
     #
     # @param (see GetSubscriptionInfoActivity)
     #
-    def initialize(domain, workflow, interface)
-      super(domain, workflow)
-      @interface = interface
-      @domain.activity_types.create('send-success', '1',
-        :default_task_list => @workflow.default_task_list,
-        :default_heartbeat_timeout => :none,
+    def initialize(workflow)
+      activity_options = {
+        :default_task_heartbeat_timeout => :none,
         :default_task_schedule_to_start_timeout => 60,
         :default_task_schedule_to_close_timeout => 3660,
-        :default_task_start_to_close_timeout => 3600,
-        :description => "#{@domain.name} send success activity")
+        :default_task_start_to_close_timeout => 3600 }
+      super(workflow, 'send-subscription-success', activity_options)
     end
 
     # Starts an execution of the send-success activity.
     #
-    def start
+    def run
     end
   end
 end
