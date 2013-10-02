@@ -5,14 +5,14 @@ dream up. In practice, these are generally either computational activities, rely
 performed by computers, but "human tasks" are also frequently employed in activities, relying on a living, breathing
 human to perform an action and then to signal its completion.
 
-In workflows, another common interaction with humans is when the workflow must signal the human that something has
+In workflows, another common interaction with humans happens when the workflow must signal the human that something has
 occured--a package has been shipped, the dog has been walked, and so forth. Here's where Amazon Simple Notification
-Service (SNS) comes in.
+Service (SNS) comes in...
 
 [Amazon SNS][sns-main] allows you to subscribe to what is termed a 'topic' that can send messages to its subscribers by
 a number of different protocols, among them: email addresses and SMS addresses (frequently mobile phone numbers).
 
-This sample provides an example of a "human task"-style workflow, which uses SNS to communicate with the user about the
+This sample provides an example of a "human task"-style workflow which uses SNS to communicate with the user about the
 status of the workflow. It uses the AWS SDK for Ruby, but many of the techniques used here apply to Amazon SWF in
 general. The architecture of the underlying HTTP-based service is represented in each of the AWS SDKs.
 
@@ -61,21 +61,20 @@ source files.
 
 Here is the recommended sequence if you'd like to simply dive right into the code:
 
-1. Start with `utils.rb`, which contains code that sets up the Amazon SWF domain and is used by other source files. It's
-    short and easy to understand.
+1. Start with [utils.rb][code-utils], which contains code that sets up the Amazon SWF domain and is used by other source
+    files. It's short and easy to understand.
 
-2. Move onto `swf_sns_sample.rb`, which contains the workflow and workflow starter code.
+2. Move onto [swf_sns_sample.rb][code-swf-sns-sample], which contains the workflow and workflow starter code.
 
-3. Next, look at `basic_activity.rb`. This file contains code that is common to all of the activities in the sample, and
-    provides some uniformity in how they can be called.
+3. Next, look at [basic_activity.rb][code-basic-activity]. This file contains code that is common to all of the
+    activities in the sample, and provides some uniformity in how they can be called.
 
 4. For an example of a simple human input activity and how it can provide data to the workflow, see the code in
-    `get_content_activity.rb`. It prompts the user for input, and then sends the input back to the workflow.
+    [get_contact_activity.rb][code-get-content-activity]. It prompts the user for input, and then sends the input back
+    to the workflow.
 
-5. See `send_sns_activity.rb` for code that sets up an Amazon SNS topic and uses the data provided by GetContentActivity
-    to subcribe the user to the workflow.
-
-
+5. See [send_sns_activity.rb][code-send-sns-activity] for code that sets up an Amazon SNS topic and uses the data
+    provided by *GetContactActivity* to subcribe the user to the workflow.
 
 [awsaccount]: http://aws.amazon.com/
 [awssdk-ruby]: http://aws.amazon.com/sdkforruby/
@@ -84,4 +83,8 @@ Here is the recommended sequence if you'd like to simply dive right into the cod
 [sns-main]: http://aws.amazon.com/sns/
 [sns-topic]: http://docs.aws.amazon.com/AWSRubySDK/latest/AWS/SNS/Topic.html
 [swf-main]: http://aws.amazon.com/swf/
-
+[code-utils]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/utils.rb
+[code-swf-sns-sample]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/swf_sns_sample.rb
+[code-basic-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/basic_activity.rb
+[code-get-content-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/get_contact_activity.rb
+[code-send-sns-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/send_sns_activity.rb
