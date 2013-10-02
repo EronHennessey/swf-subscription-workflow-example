@@ -16,6 +16,7 @@ module SubscriptionWorkflowExample
     #   The generic interface that is used to communicate with the user.
     #
     def initialize(workflow, interface)
+      puts "#{self.class}##{__method__}"
       @interface = interface
 
       # this is a human task, and we expect the person to type in an e-mail address and/or phone number. If the person
@@ -32,7 +33,8 @@ module SubscriptionWorkflowExample
     # Starts an execution of the get-subscription-info activity.
     #
     def run
-      puts "Running GetSubsciptionInfoActivity..."
+      puts "#{self.class}##{__method__}"
+
       # this will block until the user has entered the information.
       subscriber_data = @interface.get_subscriber_data
       if subscriber_data[:email].nil? && subscriber_data[:sms].nil?

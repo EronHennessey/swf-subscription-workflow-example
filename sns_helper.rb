@@ -28,6 +28,7 @@ module SubscriptionWorkflowExample
     #   The AWS region to use.
     #
     def initialize(topic_name, display_name, aws_region = @@SMS_REGION)
+      puts "#{self.class}##{__method__}"
       # Data for an instance. An instance handles one subscriber's data at a time.
       @aws_region = aws_region
       @topic_data = { :topic_name => topic_name, :display_name => display_name, :arn => nil }
@@ -45,10 +46,12 @@ module SubscriptionWorkflowExample
     #   The SNS topic Amazon Resource Name (ARN)
     #
     def create_topic
-      puts "SNSHelper # create_topic ( #{@topic_data[:topic_name]} )"
+      puts "#{self.class}##{__method__}"
       # create a new SNS topic and get the Amazon Resource Name (ARN).
       response = @sns_client.create_topic(:name => @topic_data[:topic_name])
       @topic_data[:arn] = response[:topic_arn]
+
+      puts "SNSHelper #create_topic (created topic: #{@topic_data[:arn]})"
 
       # For an SMS notification, setting `DisplayName` is *required*. Note that only the *first 10 characters* of the
       # DisplayName will be shown on the SMS message sent to the user, so choose your DisplayName wisely!
@@ -57,8 +60,9 @@ module SubscriptionWorkflowExample
         :attribute_name => "DisplayName",
         :attribute_value => @topic_data[:display_name] })
 
-      puts "SNSHelper # create_topic (out)"
-      # return the ARN
+      puts "SNSHelper #create_topic (set topic attributes: #{response})"
+
+      # return the topic ARN
       return @topic_data[:arn]
     end # create_topic
 
@@ -71,7 +75,7 @@ module SubscriptionWorkflowExample
     #   The user's phone number. This phone number must be able to accept SMS messages.
     #
     def subscribe_topic(user_email, user_phone)
-      puts "SNSHelper # subscribe_topic ( #{user_email}, #{user_phone} )"
+      puts "#{self.class}##{__method__} (#{user_email}, #{user_phone})"
 
       @subscriber_data[:email] = user_email
       @subscriber_data[:sms] = user_phone
@@ -100,6 +104,7 @@ module SubscriptionWorkflowExample
     #   If no subscription request is active for the *type* provided, then `nil` will be returned.
     #
     def get_subscription_status(type)
+      puts "#{self.class}##{__method__} (#{type})"
       if(@topic_data[:arn] == nil)
         return 'Error: Topic not created.'
       end
@@ -121,6 +126,7 @@ module SubscriptionWorkflowExample
 
     # Delete the SNS topic
     def delete_topic
+      puts "#{self.class}##{__method__}"
       response = @sns_client.delete_topic(:topic_arn => @topic_data[:arn])
     end # delete_topic
   end # SNSHelper

@@ -20,12 +20,9 @@ module SubscriptionWorkflowExample
     #
     #     activities = [ get_subscription_info, subscribe_user, [ confirm_email, confirm_sms, :or ], send_subscription_success ]
     #
-    # @param domain
+    # @param domain_name
     #   The [Domain](http://docs.aws.amazon.com/AWSRubySDK/latest/AWS/SimpleWorkflow/Domain.html) to register the
     #   workflow in.
-    #
-    # @param [String] task_list
-    #   The task list to use for decision tasks.
     #
     # @param [GenericInterface] generic_interface
     #   The generic interface that is used to communicate with the user.
@@ -54,7 +51,7 @@ module SubscriptionWorkflowExample
 
     # Handle ActivityTaskCompleted events
     def handle_activity_completed(decision_task, event)
-      puts "SubscribeWorkflow # handle_activity_completed"
+      puts "#{self.class}##{__method__}"
 
       # if the activity has any data, store it.
       if event.attributes[:result] != nil
@@ -76,7 +73,7 @@ module SubscriptionWorkflowExample
 
     # Handle ActivityTaskTimedOut events
     def handle_activity_timed_out(decision_task, event)
-      puts "SubscribeWorkflow # handle_activity_timed_out"
+      puts "#{self.class}##{__method__}"
     end
   end
 end

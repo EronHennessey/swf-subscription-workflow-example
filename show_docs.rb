@@ -5,10 +5,12 @@
 # @author Eron Hennessey
 #
 
+# Builds the Subscription Workflow Example documentation using [Yard](http://www.yardoc.org/).
 def build_docs
   system("yard doc --markup markdown *.rb")
 end
 
+# Starts a server to view the Subscription Workflow Example documentation using [Yard](http://www.yardoc.org/).
 def show_docs
   pid = spawn("yard server")
   Process.detach pid
