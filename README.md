@@ -29,9 +29,9 @@ You must also have your AWS Access keys set up as per the [AWS SDK for Ruby Gett
 
 ## Downloading and Running the Sample
 
-You can get the source code for the sample and a text version of this guide at the following location:
+To download a .zip archive of the source code for the sample and this README, use this link:
 
-* <http://TBD>
+* <https://github.com/EronHennessey/swf-subscription-workflow-example/archive/master.zip>
 
 *To run the sample*
 
