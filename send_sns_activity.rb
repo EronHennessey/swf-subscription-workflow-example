@@ -8,7 +8,6 @@ require_relative 'basic_activity.rb'
 class SendSNSActivity < BasicActivity
 
   def initialize(domain, task_list)
-    puts "#{self.class}##{__method__}"
     super(domain, task_list, 'send_sns_activity')
 
     # Create an SNS client. This is used to interact with the service. Set the
@@ -27,8 +26,6 @@ class SendSNSActivity < BasicActivity
 
   # Get some data to use to subscribe to the topic.
   def do_activity(input)
-    puts "#{self.class}##{__method__}"
-
     if input.nil?
       @results = { :reason => "Didn't receive any input!", :detail => "" }
       return false
@@ -58,7 +55,6 @@ class SendSNSActivity < BasicActivity
   #   The SNS topic Amazon Resource Name (ARN)
   #
   def create_topic
-    puts "#{self.class}##{__method__}"
     # create a new SNS topic and get the Amazon Resource Name (ARN).
     response = @sns_client.create_topic(:name => @activity_data[:topic][:name])
     @activity_data[:topic][:arn] = response[:topic_arn]
@@ -83,7 +79,6 @@ class SendSNSActivity < BasicActivity
   #   messages.
   #
   def subscribe_topic
-    puts "#{self.class}##{__method__}"
     [:email, :sms].each do | x |
       if @activity_data[x][:address] != nil
         response = @sns_client.subscribe({

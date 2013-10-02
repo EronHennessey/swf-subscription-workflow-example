@@ -61,7 +61,6 @@ class BasicActivity
       options_differ = false
       activity_options.keys.each do | option_type |
         if @activity_type.send(option_type) != activity_options[option_type]
-          puts "  Option #{option_type} is different. Prev: #{@activity_type.send(option_type)}, New: #{activity_options[option_type]}"
           options_differ = true
         end
       end
@@ -69,28 +68,23 @@ class BasicActivity
       # if the options differ, we need to change the version.
       if options_differ
         activity_version = @activity_type.version
-        puts "activity_version = #{activity_version}"
         begin
           # hopefully, it's just a number...
           n = Integer (activity_version)
-          puts "   ...it's a number"
           activity_version = String(n.next)
         rescue
-          puts "   ...it's not a number"
           # ...if not, attempt to split the numeric part of the string from the
           # rest of it
           (activity_version, n) = activity_version.partition("\d+")
           n = n.to_i
           activity_version << String(n.next)
         end
-        puts "   new activity_version = #{activity_version}"
         # options differ, so we'll register the activity type again
         @activity_type = nil
       end
     end
 
     if @activity_type.nil?
-      puts "   registering new activity #{@name}, #{activity_version}"
       @activity_type = domain.activity_types.create(@name, activity_version, activity_options)
     end
   end
@@ -122,7 +116,6 @@ class BasicActivity
   #   The that was received by the activity task poller.
   #
   def handle_activity_task(task)
-    puts "#{self.class}##{__method__}"
     # default behavior is to just do the activity and return completion.
     if do_activity(task.input)
       task.complete!({ :result => @results })
@@ -135,11 +128,7 @@ class BasicActivity
   # Polls for activities until the activity is marked complete.
   #
   def poll_for_activities
-    puts "  #{self.class}##{__method__}"
-
     @domain.activity_tasks.poll(@task_list) do | task |
-      puts "    Received activity task: #{task.activity_type.name}"
-      puts "    activity task input: #{task.input}"
       if task.activity_type.name == @name
         return handle_activity_task(task)
       end

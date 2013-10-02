@@ -17,8 +17,6 @@ end
 
 # Registers the domain that the workflow will run in.
 def init_domain
-  puts "  #{self.class}##{__method__}"
-
   domain_name = 'SWFSNSSampleDomain'
   domain = nil
   swf = AWS::SimpleWorkflow.new
@@ -34,11 +32,7 @@ def init_domain
   if domain.nil?
     # Register the domain for one day.
     domain = swf.domains.create(domain_name, 1, { :description => "#{domain_name} domain" })
-    puts "    created domain: #{domain.inspect}"
-  else
-    puts "    domain found: #{domain.inspect}"
   end
-  puts "    status: #{domain.status}"
 
   return domain
 end

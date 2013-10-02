@@ -15,7 +15,6 @@ class SampleWorkflow
   attr_accessor :name
 
   def initialize
-    puts "  #{self.class}##{__method__}"
     @domain = init_domain
 
     task_list = get_uuid
@@ -26,8 +25,6 @@ class SampleWorkflow
 
   # Registers the workflow
   def register_workflow(task_list)
-    puts "  #{self.class}##{__method__}"
-
     workflow_name = "swf-sns-workflow-#{task_list}"
     @workflow_type = nil
 
@@ -52,7 +49,6 @@ class SampleWorkflow
       options_differ = false
       options.keys.each do | option_type |
         if @workflow_type.send(option_type) != options[option_type]
-          puts "  Option #{option_type} is different. Prev: #{@workflow_type.send(option_type)}, New: #{options[option_type]}"
           options_differ = true
         end
       end
@@ -83,9 +79,6 @@ class SampleWorkflow
 
   # Registers all of the activities
   def register_activities(task_list)
-    puts "  #{self.class}##{__method__}"
-    #activity_sequence = [ GetContactActivity, SendSNSActivity, WaitforSNSActivity, SendResultActivity ]
-
     # This list is in order of the operations to be performed.
     activity_sequence = [ GetContactActivity, SendSNSActivity ]
 
@@ -101,22 +94,16 @@ class SampleWorkflow
 
   # poll for decision tasks
   def poll_for_decisions
-    puts "  #{self.class}##{__method__}"
     # first, poll for decision tasks...
     @domain.decision_tasks.poll(@workflow_type.default_task_list) do | task |
       task.new_events.each do | event |
-        puts "    decision task received: #{event.event_type}"
-        puts "      event_attributes: #{event.attributes.inspect}"
-
         case event.event_type
           when 'WorkflowExecutionStarted'
-            puts "      workflow execution started. Scheduling first activity: #{@activity_list.last.name}"
             task.schedule_activity_task(@activity_list.last.activity_type)
           when 'ActivityTaskCompleted'
             completed_task = @activity_list.pop
             # if this was the final task, then finish the workflow.
             if @activity_list.empty?
-              puts "****  Workflow complete!"
               task.complete!
               task.complete_workflow_execution
               return false
@@ -128,20 +115,15 @@ class SampleWorkflow
                 @activity_list.last.activity_type,
                 { :input => event.attributes.result })
             end
-          when 'ActivityTaskScheduled'
-            puts "      activity task scheduled: name=#{event.attributes.activity_type.name} id=#{event.attributes.activity_id}"
           when 'ActivityTaskTimedOut'
-            puts "      activity task timed out!  type=#{event.attributes.timeout_type}"
             task.complete!
             task.fail_workflow_execution
             return false
           when 'ActivityTaskFailed'
-            puts "      activity task failed! name=#{event.attributes.activity_type.name} id=#{event.attributes.activity_id}"
             task.complete!
             task.fail_workflow_execution
             return false
           when 'WorkflowExecutionCompleted'
-            puts "      workflow execution completed!"
             task.complete!
             task.workflow_execution.terminate
             return false
@@ -153,7 +135,6 @@ class SampleWorkflow
   end
 
   def start_execution
-    puts "  #{self.class}##{__method__}"
     @workflow_type.start_execution
 
     # start the activity pollers, each on their own process.
@@ -164,7 +145,6 @@ class SampleWorkflow
     end
 
     poll_for_decisions
-    puts "poll_for_decisions ended... waiting for processes to complete"
 
     # wait for all the sub-processes to complete.
     Process.wait

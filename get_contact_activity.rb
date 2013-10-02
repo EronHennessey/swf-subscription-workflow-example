@@ -15,8 +15,6 @@ class GetContactActivity < BasicActivity
 
   # Get some data to use to subscribe to the topic.
   def do_activity(input = nil)
-    puts "#{self.class}##{__method__}"
-
     subscriber_data = { :email => nil, :sms => nil }
 
     puts "\nPlease enter your email address and/or your phone number to confirm your subscription."
