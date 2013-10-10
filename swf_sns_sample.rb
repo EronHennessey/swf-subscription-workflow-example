@@ -9,122 +9,129 @@ require 'aws-sdk'
 require_relative 'utils.rb'
 require_relative 'get_contact_activity.rb'
 require_relative 'send_sns_activity.rb'
+require_relative 'wait_for_sns_activity.rb'
+require_relative 'send_result_activity.rb'
 
 class SampleWorkflow
 
   attr_accessor :name
 
-  def initialize
+  def initialize(task_list)
+
+    # the domain to look for decision tasks in.
     @domain = init_domain
 
-    task_list = get_uuid
+    # the task list is used to poll for decision tasks.
+    @task_list = task_list
 
-    register_workflow(task_list)
-    register_activities(task_list)
+    # The list of activities to run, in order. These hashes can be passed
+    # directly to AWS::SimpleWorkflow::DecisionTask#schedule_activity_task.
+    @activity_list = [
+      { :name => 'get_contact_activity', :version => 'v1' },
+      { :name => 'send_sns_activity', :version => 'v1' },
+      { :name => 'wait_for_sns_activity', :version => 'v1' },
+      { :name => 'send_result_activity', :version => 'v1' }
+    ].reverse! # reverse the order, since we'll pop them stack-wise.
+
+    register_workflow
   end
 
   # Registers the workflow
-  def register_workflow(task_list)
-    workflow_name = "swf-sns-workflow-#{task_list}"
+  def register_workflow
+    workflow_name = 'swf-sns-workflow'
     @workflow_type = nil
 
     options =  {
-      :default_task_list => task_list,
       :default_child_policy => :terminate,
       :default_task_start_to_close_timeout => 3600,
       :default_execution_start_to_close_timeout => 24 * 3600 }
 
-    # Check to see if the workflow already exists.
-    @domain.workflow_types.each do | w |
-      if w.name == workflow_name
-        @workflow_type = w
-      end
-    end
-
     # a default value...
     workflow_version = '1'
 
-    if @workflow_type
-      # the workflow type was found. Check to see if the options are the same.
-      options_differ = false
-      options.keys.each do | option_type |
-        if @workflow_type.send(option_type) != options[option_type]
-          options_differ = true
+    # Check to see if this workflow type already exists.
+    @domain.workflow_types.each do | a |
+      if a.name == workflow_name
+        # A workflow type with the same name was found. if the version number of
+        # the found workflow is greater than this one, increment it and make it
+        # the new workflow version
+        if a.version >= workflow_version
+          workflow_version = a.version.succ
         end
-      end
-      if options_differ
-        # if the options differ, we need to change the version.
-        workflow_version = @workflow_type.version
-        begin
-          # hopefully, it's just a number...
-          n = Integer (workflow_version)
-          workflow_version = String(n.next)
-        rescue
-          # ...if not, attempt to split the numeric part of the string from the
-          # rest of it
-          (workflow_version, n) = workflow_version.partition("\d+")
-          n = n.to_i
-          workflow_version << String(n.next)
+
+        # Check to see if the options are the same.
+        matches = true
+        options.keys.each do | option_key |
+          if a.send(option_key) != options[option_key]
+            matches = false
+          end
         end
-        # options differ, so we'll register the workflow type again
-        @workflow_type = nil
+
+        if matches
+          @workflow_type = a
+        end
       end
     end
 
-    if(@workflow_type.nil?)
-      @workflow_type = @domain.workflow_types.create(
-        workflow_name, workflow_version, options)
+    if @workflow_type.nil?
+      puts "registering workflow: #{workflow_name}, #{workflow_version}, #{options.inspect}"
+      @workflow_type = @domain.workflow_types.create(workflow_name, workflow_version, options)
     end
-  end
 
-  # Registers all of the activities
-  def register_activities(task_list)
-    # This list is in order of the operations to be performed.
-    activity_sequence = [ GetContactActivity, SendSNSActivity ]
-
-    # reverse the list so that when we push each element onto the stack, we can
-    # just pop to get the next activity.
-    activity_sequence.reverse!
-
-    # fill the list with objects
-    @activity_list = []
-    activity_sequence.each { | activity_class |
-      @activity_list.push(activity_class.new(@domain, task_list)) }
+    puts "** registered workflow: #{workflow_name}"
   end
 
   # poll for decision tasks
   def poll_for_decisions
     # first, poll for decision tasks...
-    @domain.decision_tasks.poll(@workflow_type.default_task_list) do | task |
+    @domain.decision_tasks.poll(@task_list) do | task |
       task.new_events.each do | event |
         case event.event_type
           when 'WorkflowExecutionStarted'
-            task.schedule_activity_task(@activity_list.last.activity_type)
+            puts "** scheduling activity task: #{@activity_list.last[:name]}"
+            task.schedule_activity_task(@activity_list.last, {
+              :task_list => @task_list } )
           when 'ActivityTaskCompleted'
+            # pop the current task off the stack.
             completed_task = @activity_list.pop
+            name = completed_task[:name]
+            puts "-- #{name} is complete. #{@activity_list.count} tasks remaining"
+            if event.attributes.key?(:result)
+              puts "-- #{name} results: #{event.attributes[:result]}"
+            else
+              puts "-- #{name} results: NONE"
+            end
+
             # if this was the final task, then finish the workflow.
             if @activity_list.empty?
-              task.complete!
+              puts "!! All activities complete! Sending complete_workflow_execution..."
               task.complete_workflow_execution
               return false
             else
               # schedule the next activity, passing any results from the
               # previous activity. Results will be received in the activity
               # task.
-              task.schedule_activity_task(
-                @activity_list.last.activity_type,
-                { :input => event.attributes.result })
+              puts "** scheduling activity task: #{@activity_list.last[:name]}"
+              if event.attributes.has_key?('result')
+                task.schedule_activity_task(
+                  @activity_list.last, {
+                    :input => event.attributes[:result],
+                    :task_list => @task_list } )
+              else
+                task.schedule_activity_task(
+                  @activity_list.last, { :task_list => @task_list } )
+              end
             end
           when 'ActivityTaskTimedOut'
-            task.complete!
+            puts "!! Failing workflow execution! (timed out activity)"
             task.fail_workflow_execution
             return false
           when 'ActivityTaskFailed'
-            task.complete!
+            puts "!! Failing workflow execution! (failed activity)"
             task.fail_workflow_execution
             return false
           when 'WorkflowExecutionCompleted'
-            task.complete!
+            puts "## Yesss, workflow execution completed!"
             task.workflow_execution.terminate
             return false
         end
@@ -135,25 +142,42 @@ class SampleWorkflow
   end
 
   def start_execution
-    @workflow_type.start_execution
-
-    # start the activity pollers, each on their own process.
-    @activity_list.each do | activity |
-      fork do
-        activity.poll_for_activities
-      end
-    end
+    workflow_execution = @workflow_type.start_execution( {
+      :task_list => @task_list } )
 
     poll_for_decisions
-
-    # wait for all the sub-processes to complete.
-    Process.wait
   end
 end
 
 # if the file was run from the command-line, instantiate the class and begin the workflow execution.
 if __FILE__ == $0
-  sample_workflow = SampleWorkflow.new
+
+  # Get an UUID to use as the task list name. We'll use the same task list name
+  # in the activity worker.
+
+  task_list = get_uuid
+
+  # Let the user start the activity worker first...
+
+  puts ""
+  puts "Amazon SWF Example"
+  puts "------------------"
+  puts ""
+  puts "Start the activity worker, preferably in a separate command-line window, with"
+  puts "the following command:"
+  puts ""
+  puts "> ruby activities_worker.rb #{task_list}"
+  puts ""
+  puts "You can copy & paste it if you like, just don't copy the '>' character."
+  puts ""
+  puts "Press return when you're ready..."
+
+  i = gets
+
+  # Now, start the workflow.
+
+  puts "Starting workflow execution."
+  sample_workflow = SampleWorkflow.new(task_list)
   sample_workflow.start_execution
 end
 

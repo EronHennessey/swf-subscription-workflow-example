@@ -17,7 +17,7 @@ end
 
 # Registers the domain that the workflow will run in.
 def init_domain
-  domain_name = 'SWFSNSSampleDomain'
+  domain_name = 'SWFSampleDomain'
   domain = nil
   swf = AWS::SimpleWorkflow.new
 

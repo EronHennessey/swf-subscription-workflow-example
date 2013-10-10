@@ -52,7 +52,23 @@ To download a .zip archive of the source code for the sample and this README, us
 
         ruby swf_sns_sample.rb
 
-The sample should begin running and providing reports of its progress to the terminal.
+   The sample should begin running--you will know if you are prompted for your email address and/or phone number.
+
+   **Note:** If you're running ruby outside of Cygwin on Windows, you will get this message:
+
+        swf_sns_sample.rb:142:in `fork': fork() function is unimplemented on this machine (NotImplementedError)
+                from swf_sns_sample.rb:142:in `block in start_execution'
+                from swf_sns_sample.rb:141:in `each'
+                from swf_sns_sample.rb:141:in `start_execution'
+                from swf_sns_sample.rb:157:in `<main>'
+
+4. Enter your e-mail and/or phone number for SMS messaging at the prompt. For a valid SMS message address, be sure to
+    enter your phone number as all numerals, preceded by country code, such as `12068889999`. This is the first human
+    task in the workflow.
+
+5. Wait for a message to appear on any of the addresses that you entered (email or SMS). It will look something like
+    this:
+
 
 ## Examining the Code
 
