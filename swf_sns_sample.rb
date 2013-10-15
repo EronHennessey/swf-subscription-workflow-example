@@ -7,10 +7,6 @@
 require 'aws-sdk'
 
 require_relative 'utils.rb'
-require_relative 'get_contact_activity.rb'
-require_relative 'send_sns_activity.rb'
-require_relative 'wait_for_sns_activity.rb'
-require_relative 'send_result_activity.rb'
 
 class SampleWorkflow
 
@@ -22,16 +18,16 @@ class SampleWorkflow
     @domain = init_domain
 
     # the task list is used to poll for decision tasks.
-    @task_list = task_list
+    @task_list = get_uuid
 
-    # The list of activities to run, in order. These hashes can be passed
-    # directly to AWS::SimpleWorkflow::DecisionTask#schedule_activity_task.
+    # The list of activities to run, in order. These name/version hashes can be
+    # passed directly to AWS::SimpleWorkflow::DecisionTask#schedule_activity_task.
     @activity_list = [
       { :name => 'get_contact_activity', :version => 'v1' },
-      { :name => 'send_sns_activity', :version => 'v1' },
-      { :name => 'wait_for_sns_activity', :version => 'v1' },
-      { :name => 'send_result_activity', :version => 'v1' }
-    ].reverse! # reverse the order, since we'll pop them stack-wise.
+      { :name => 'subscribe_topic_activity', :version => 'v1' },
+      { :name => 'wait_for_confirmation_activity', :version => 'v1' },
+      { :name => 'send_result_activity', :version => 'v1' },
+    ].reverse! # reverse the order... we're treating this like a stack.
 
     register_workflow
   end
@@ -86,50 +82,45 @@ class SampleWorkflow
     # first, poll for decision tasks...
     @domain.decision_tasks.poll(@task_list) do | task |
       task.new_events.each do | event |
+        puts("decision event received: #{event.inspect}")
         case event.event_type
           when 'WorkflowExecutionStarted'
+            # schedule the last activity on the (reversed, remember?) list to
+            # begin the workflow.
             puts "** scheduling activity task: #{@activity_list.last[:name]}"
-            task.schedule_activity_task(@activity_list.last, {
-              :task_list => @task_list } )
+
+            task.schedule_activity_task( @activity_list.last,
+              { :task_list => "#{@task_list}" } )
+
           when 'ActivityTaskCompleted'
-            # pop the current task off the stack.
-            completed_task = @activity_list.pop
-            name = completed_task[:name]
-            puts "-- #{name} is complete. #{@activity_list.count} tasks remaining"
+            # we are running the activities in strict sequential order, and
+            # using the results of the previous activity as input for the next
+            # activity.
             if event.attributes.key?(:result)
-              puts "-- #{name} results: #{event.attributes[:result]}"
-            else
-              puts "-- #{name} results: NONE"
+              results = event.attributes[:result]
+
+              last_activity = @activity_list.pop
+              if(last_activity == nil)
+                return false;
+              end
+
+              # schedule the next activity, providing it any results.
+              task.schedule_activity_task(
+                @activity_list.last,
+                { :input => results, :task_list => "#{@task_list}" }
+              )
             end
 
-            # if this was the final task, then finish the workflow.
-            if @activity_list.empty?
-              puts "!! All activities complete! Sending complete_workflow_execution..."
-              task.complete_workflow_execution
-              return false
-            else
-              # schedule the next activity, passing any results from the
-              # previous activity. Results will be received in the activity
-              # task.
-              puts "** scheduling activity task: #{@activity_list.last[:name]}"
-              if event.attributes.has_key?('result')
-                task.schedule_activity_task(
-                  @activity_list.last, {
-                    :input => event.attributes[:result],
-                    :task_list => @task_list } )
-              else
-                task.schedule_activity_task(
-                  @activity_list.last, { :task_list => @task_list } )
-              end
-            end
           when 'ActivityTaskTimedOut'
             puts "!! Failing workflow execution! (timed out activity)"
             task.fail_workflow_execution
             return false
+
           when 'ActivityTaskFailed'
             puts "!! Failing workflow execution! (failed activity)"
             task.fail_workflow_execution
             return false
+
           when 'WorkflowExecutionCompleted'
             puts "## Yesss, workflow execution completed!"
             task.workflow_execution.terminate
@@ -144,7 +135,6 @@ class SampleWorkflow
   def start_execution
     workflow_execution = @workflow_type.start_execution( {
       :task_list => @task_list } )
-
     poll_for_decisions
   end
 end

@@ -1,6 +1,6 @@
 require_relative 'get_contact_activity.rb'
-require_relative 'send_sns_activity.rb'
-require_relative 'wait_for_sns_activity.rb'
+require_relative 'subscribe_topic_activity.rb'
+require_relative 'wait_for_confirmation_activity.rb'
 require_relative 'send_result_activity.rb'
 
 class ActivitiesWorker
@@ -10,11 +10,11 @@ class ActivitiesWorker
     @task_list = task_list
     @activities = {}
 
-    # These are the activities we'll run, in order.
+    # These are the activities we'll run...
     activity_sequence = [
       GetContactActivity,
-      SendSNSActivity,
-      WaitForSNSActivity,
+      SubscribeTopicActivity,
+      WaitForConfirmationActivity,
       SendResultActivity ]
 
     activity_sequence.each do | activity_class |
@@ -29,10 +29,11 @@ class ActivitiesWorker
   # Polls for activities until the activity is marked complete.
   #
   def poll_for_activities
-    @domain.activity_tasks.poll(@task_list) do | task |
-      activity_name = task.activity_type.name
+    puts("#{__method__}, task_list: #{@task_list}")
 
-      puts("#{activity_name}: #{__method__}")
+    @domain.activity_tasks.poll(@task_list) do | task |
+      puts("activity task received: #{task.inspect}")
+      activity_name = task.activity_type.name
 
       # find the task on the activities list, and run it.
       if @activities.key?(activity_name.to_sym)
@@ -58,12 +59,9 @@ end
 # if the file was run from the command-line, instantiate the class and begin the
 # activities
 if __FILE__ == $0
-  if ARGV.count < 1
-    puts "Need a task list!"
-  else
-    worker = ActivitiesWorker.new(init_domain, ARGV[0])
-    worker.poll_for_activities
-    puts "All done!"
-  end
+  worker = ActivitiesWorker.new(
+    init_domain, (ARGV.count < 1) ? get_uuid : ARGV[0])
+  worker.poll_for_activities
+  puts "All done!"
 end
 
