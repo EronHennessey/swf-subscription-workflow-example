@@ -45,10 +45,10 @@ To download a .zip archive of the source code for the sample and this README, us
     * basic_activity.rb
     * get_contact_activity.rb
     * send_result_activity.rb
-    * send_sns_activity.rb
+    * subscribe_topic_activity.rb
     * swf_sns_sample.rb
     * utils.rb
-    * wait_for_sns_activity.rb
+    * wait_for_confirmation_activity.rb
 
 3. Run `swf_sns_sample.rb` as shown:
 
@@ -62,7 +62,7 @@ To download a .zip archive of the source code for the sample and this README, us
         Start the activity worker, preferably in a separate command-line window, with
         the following command:
 
-        > ruby activities_worker.rb cf423e09-c50d-4ffa-9df6-43bb23d3ad69
+        > ruby activities_worker.rb cf423e09-c50d-4ffa-9df6-43bb23d3ad69-activities
 
         You can copy & paste it if you like, just don't copy the '>' character.
 
@@ -72,7 +72,7 @@ To download a .zip archive of the source code for the sample and this README, us
    *same line* that is provided in the message. The UUID will change each time you run `swf_sns_sample.rb` (and
    represents the task list name). For example:
 
-        ruby activities_worker.rb cf423e09-c50d-4ffa-9df6-43bb23d3ad69
+        ruby activities_worker.rb cf423e09-c50d-4ffa-9df6-43bb23d3ad69-activities
 
    The activities worker will now begin running, and its first activity will prompt you for an email and phone number.
 
@@ -92,33 +92,53 @@ source files.
 Here is the recommended sequence if you'd like to simply dive right into the code:
 
 1. Start with [utils.rb][code-utils], which contains code that sets up the Amazon SWF domain and is used by other source
-    files. It's short and easy to understand.
+   files. It's short and easy to understand.
 
 2. Move onto [swf_sns_sample.rb][code-swf-sns-sample], which contains the workflow and workflow starter code.
 
-3. Next, look at [activity_worker.rb][code-activity_worker]. This code polls for activity events and launches the
+3. Next, look at [activities_worker.rb][code-activities-worker]. This code polls for activity events and launches the
    activities based on information coming from Amazon SWF.
 
 4. Now, look at [basic_activity.rb][code-basic-activity]. This file contains code that is common to *all* of the
    activities in the sample, and provides some uniformity in how they can be called. The activities are called in this
    order:
 
-    a. [get_contact_activity.rb][code-get-content-activity] is an example of a simple human input activity and how it
+    a. [get_contact_activity.rb][code-get-contact-activity] is an example of a simple human input activity and how it
        can provide data to the workflow. It prompts the user for input, and then sends the input back to the workflow.
 
-    b. [send_sns_activity.rb][code-send-sns-activity] sets up an Amazon SNS topic and uses the data provided by
-       *GetContactActivity* to subcribe the user to the workflow.
+    b. [subscribe_topic_activity.rb][code-subscribe-topic-activity] sets up an Amazon SNS topic and uses the data
+       provided by *GetContactActivity* to subcribe the user to the workflow.
 
+    c. [wait_for_confirmation_activity.rb][code-wait-for-confirmation-activity] waits for the user to confirm the
+       subscription using at least one of the addresses input during *GetContactActivity*.
 
+    d. [send_result_activity.rb][code-send-result-activity] uses the confirmed topic subscription to send the user
+       a note by simply publishing it to the topic, concluding the workflow.
+
+## For More Information
+
+For more information about Amazon SWF, Amazon SNS, and the AWS SDK for Ruby, have a look at this fine documentation:
+
+* [Amazon Simple Workflow Service Developer Guide][swfdg]
+* [Amazon Simple Notification Service Developer Guide][snsdg]
+* [AWS SDK for Ruby Developer Guide][rubysdkdg]
+* [AWS SDK for Ruby API Reference][rubysdkref]
+
+[swfdg]: http://docs.aws.amazon.com/amazonswf/latest/developerguide/
+[snsdg]: http://docs.aws.amazon.com/sns/latest/dg/welcome.html
+[rubysdkdg]: http://docs.aws.amazon.com/AWSSdkDocsRuby/latest/DeveloperGuide/welcome.html
+[rubysdkref]: http://docs.aws.amazon.com/AWSRubySDK/latest/frames.html
 [awsaccount]: http://aws.amazon.com/
 [awssdk-ruby-config]: http://aws.amazon.com/developers/getting-started/ruby/
 [awssdk-ruby]: http://aws.amazon.com/sdkforruby/
-[code-activity-worker]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/activity_worker.rb
+[code-activities-worker]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/activities_worker.rb
 [code-basic-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/basic_activity.rb
-[code-get-content-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/get_contact_activity.rb
-[code-send-sns-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/send_sns_activity.rb
+[code-get-contact-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/get_contact_activity.rb
+[code-send-result-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/send_result_activity.rb
+[code-subscribe-topic-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/subscribe_topic_activity.rb
 [code-swf-sns-sample]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/swf_sns_sample.rb
 [code-utils]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/utils.rb
+[code-wait-for-confirmation-activity]: https://github.com/EronHennessey/swf-subscription-workflow-example/blob/master/wait_for_confirmation_activity.rb
 [ruby]: https://www.ruby-lang.org/en/
 [sns-main]: http://aws.amazon.com/sns/
 [sns-topic]: http://docs.aws.amazon.com/AWSRubySDK/latest/AWS/SNS/Topic.html
