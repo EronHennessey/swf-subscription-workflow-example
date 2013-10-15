@@ -96,20 +96,28 @@ class SampleWorkflow
             # we are running the activities in strict sequential order, and
             # using the results of the previous activity as input for the next
             # activity.
-            if event.attributes.key?(:result)
-              results = event.attributes[:result]
+            last_activity = @activity_list.pop
 
-              last_activity = @activity_list.pop
-              if(last_activity == nil)
-                return false;
-              end
-
-              # schedule the next activity, providing it any results.
-              task.schedule_activity_task(
-                @activity_list.last,
-                { :input => results, :task_list => "#{@task_list}" }
-              )
+            if(@activity_list.empty? == nil)
+              puts "!! All activities complete! Sending complete_workflow_execution..."
+              task.complete_workflow_execution
+              return false;
+            else
+              # schedule the next activity, passing any results from the
+              # previous activity. Results will be received in the activity
+              # task.
+              puts "** scheduling activity task: #{@activity_list.last[:name]}"
+              if event.attributes.has_key?('result')
+                task.schedule_activity_task(
+                  @activity_list.last,
+                  { :input => event.attributes[:result],
+                    :task_list => @task_list }
+                )
+              else
+                task.schedule_activity_task(
+                  @activity_list.last, { :task_list => @task_list } )
             end
+          end
 
           when 'ActivityTaskTimedOut'
             puts "!! Failing workflow execution! (timed out activity)"
