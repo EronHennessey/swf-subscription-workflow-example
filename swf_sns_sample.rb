@@ -18,7 +18,7 @@ class SampleWorkflow
     @domain = init_domain
 
     # the task list is used to poll for decision tasks.
-    @task_list = get_uuid
+    @task_list = task_list
 
     # The list of activities to run, in order. These name/version hashes can be
     # passed directly to AWS::SimpleWorkflow::DecisionTask#schedule_activity_task.
@@ -82,7 +82,6 @@ class SampleWorkflow
     # first, poll for decision tasks...
     @domain.decision_tasks.poll(@task_list) do | task |
       task.new_events.each do | event |
-        puts("decision event received: #{event.inspect}")
         case event.event_type
           when 'WorkflowExecutionStarted'
             # schedule the last activity on the (reversed, remember?) list to
@@ -98,7 +97,7 @@ class SampleWorkflow
             # activity.
             last_activity = @activity_list.pop
 
-            if(@activity_list.empty? == nil)
+            if(@activity_list.empty?)
               puts "!! All activities complete! Sending complete_workflow_execution..."
               task.complete_workflow_execution
               return false;

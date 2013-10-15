@@ -10,7 +10,7 @@ class ActivitiesWorker
     @task_list = task_list
     @activities = {}
 
-    # These are the activities we'll run...
+    # These are the activities we'll run, in order...
     activity_sequence = [
       GetContactActivity,
       SubscribeTopicActivity,
@@ -42,6 +42,10 @@ class ActivitiesWorker
         if activity.do_activity(task)
           puts "++ Activity task completed: #{activity_name}"
           task.complete!({ :result => activity.results })
+          # if this is the final activity, stop polling.
+          if activity_name == 'send_result_activity'
+             return true
+          end
         else
           puts "-- Activity task failed: #{activity_name}"
           task.fail!(

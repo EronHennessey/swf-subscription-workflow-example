@@ -13,16 +13,16 @@ class SubscribeTopicActivity < BasicActivity
 
   # Create an SNS topic and return the ARN
   def create_topic(sns_client)
-    topic_arn = sns_client.create_topic(:name => 'SWF_Sample_Topic')
+    topic_arn = sns_client.create_topic(:name => 'SWF_Sample_Topic')[:topic_arn]
 
     if topic_arn != nil
       # For an SMS notification, setting `DisplayName` is *required*. Note that
       # only the *first 10 characters* of the DisplayName will be shown on the
       # SMS message sent to the user, so choose your DisplayName wisely!
-      sns_client.set_topic_attributes({
+      sns_client.set_topic_attributes( {
         :topic_arn => topic_arn,
         :attribute_name => 'DisplayName',
-        :attribute_value => 'SWFSample' })
+        :attribute_value => 'SWFSample' } )
     else
       @results = {
         :reason => "Couldn't create SNS topic", :detail => "" }.to_yaml
@@ -43,9 +43,9 @@ class SubscribeTopicActivity < BasicActivity
     }
 
     if task.input != nil
-      input_data = YAML.load(task.input)
-      email = input_data[:email]
-      sms = input_data[:sms]
+      input = YAML.load(task.input)
+      activity_data[:email][:endpoint] = input[:email]
+      activity_data[:sms][:endpoint] = input[:sms]
     else
       @results = { :reason => "Didn't receive any input!", :detail => "" }.to_yaml
       puts("  #{@results.inspect}")
@@ -66,15 +66,14 @@ class SubscribeTopicActivity < BasicActivity
     end
 
     # Subscribe the user to the topic, using either or both endpoints.
-    [:email, :sms].each do | protocol |
-      endpoint = activity_data[protocol][:endpoint]
+    [:email, :sms].each do | x |
+      ep = activity_data[x][:endpoint]
       # don't try to subscribe an empty endpoint
-      if (endpoint != nil && endpoint != "")
-        response = sns_client.subscribe({
-          :topic_arn => topic_arn,
-          :protocol => protocol.to_s,
-          :endpoint => endpoint})
-        activity_data[protocol][:subscription_arn] = response[:subscription_arn]
+      if (ep != nil && ep != "")
+        response = sns_client.subscribe( {
+          :topic_arn => activity_data[:topic_arn],
+          :protocol => x.to_s, :endpoint => ep } )
+        activity_data[x][:subscription_arn] = response[:subscription_arn]
       end
     end
 

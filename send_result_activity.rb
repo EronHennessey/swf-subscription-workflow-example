@@ -23,12 +23,12 @@ class SendResultActivity < BasicActivity
     input = YAML.load(task.input)
 
     # get the topic, so we publish a message to it.
-    topic = AWS::SNS::Topic.new(input[:arn])
+    topic = AWS::SNS::Topic.new(input[:topic_arn])
 
     if topic.nil?
       @results = {
         :reason => "Couldn't get SWF topic",
-        :detail => "Topic ARN: #{topic_arn}" }
+        :detail => "Topic ARN: #{topic.arn}" }
       return false
     end
 
