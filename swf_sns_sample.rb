@@ -89,7 +89,7 @@ class SampleWorkflow
             puts "** scheduling activity task: #{@activity_list.last[:name]}"
 
             task.schedule_activity_task( @activity_list.last,
-              { :task_list => "#{@task_list}" } )
+              { :task_list => "#{@task_list}-activities" } )
 
           when 'ActivityTaskCompleted'
             # we are running the activities in strict sequential order, and
@@ -110,11 +110,11 @@ class SampleWorkflow
                 task.schedule_activity_task(
                   @activity_list.last,
                   { :input => event.attributes[:result],
-                    :task_list => @task_list }
+                    :task_list => "#{@task_list}-activities" }
                 )
               else
                 task.schedule_activity_task(
-                  @activity_list.last, { :task_list => @task_list } )
+                  @activity_list.last, { :task_list => "#{@task_list}-activities" } )
             end
           end
 
@@ -163,7 +163,7 @@ if __FILE__ == $0
   puts "Start the activity worker, preferably in a separate command-line window, with"
   puts "the following command:"
   puts ""
-  puts "> ruby activities_worker.rb #{task_list}"
+  puts "> ruby activities_worker.rb #{task_list}-activities"
   puts ""
   puts "You can copy & paste it if you like, just don't copy the '>' character."
   puts ""
